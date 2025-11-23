@@ -41,20 +41,20 @@ const sendEmail = async (req, res) => {
         console.log('📤 Attempting to send email...', {
             from: fromEmail,
             to: email,
-            subject: "Welcome to OccasionSuper - Your Account Credentials"
+            subject: "Welcome to oveventz - Your Account Credentials"
         });
 
         const info = await transporter.sendMail({
-            from: `"OccasionSuper Support" <${fromEmail}>`,
+            from: `"oveventz Support" <${fromEmail}>`,
             to: email,
-            subject: "Welcome to OccasionSuper - Your Account Credentials",
+            subject: "Welcome to oveventz - Your Account Credentials",
             html: `
               <!DOCTYPE html>
               <html lang="en">
               <head>
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Welcome to OccasionSuper</title>
+                <title>Welcome to oveventz</title>
                 <style>
                   * {
                     margin: 0;
@@ -327,8 +327,8 @@ const sendEmail = async (req, res) => {
                 <div class="email-container">
                   <!-- Header with Logo -->
                   <div class="header">
-                    <img src="https://via.placeholder.com/140x70/ffffff/667eea?text=OccasionSuper" alt="OccasionSuper Logo" class="logo">
-                    <h1>Welcome to OccasionSuper!</h1>
+                    <img src="https://via.placeholder.com/140x70/ffffff/667eea?text=oveventz" alt="oveventz Logo" class="logo">
+                    <h1>Welcome to oveventz!</h1>
                     <p>Your trusted partner for extraordinary occasions</p>
                   </div>
                   
@@ -350,7 +350,7 @@ const sendEmail = async (req, res) => {
                     </div>
                     
                     <div class="message">
-                      Thank you for contacting <strong>OccasionSuper.com</strong> (GMNP Services and Marketing Pvt Ltd)! 
+                      Thank you for contacting <strong>oveventz.com</strong> (GMNP Services and Marketing Pvt Ltd)! 
                       We're thrilled about your interest and are excited to partner with you. We've created your 
                       personalized account to get you started on this amazing journey with us.
                     </div>
@@ -395,11 +395,11 @@ const sendEmail = async (req, res) => {
                   <div class="footer">
                     <div class="company-info">
                       <strong>GMNP Services and Marketing Pvt Ltd</strong><br>
-                      OccasionSuper.com - Creating Memorable Moments
+                      oveventz.com - Creating Memorable Moments
                     </div>
                     
                     <div class="contact-info">
-                      📧 support@occasionsuper.com | 📞 +91 9870823328<br>
+                      📧 support@oveventz.com | 📞 +91 9870823328<br>
                       💼 Business Hours: Mon-Sat 9AM-7PM IST<br>
                       🌟 Making every occasion extraordinary!
                     </div>
