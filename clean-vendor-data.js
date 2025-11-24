@@ -4,7 +4,7 @@ const User = require("./src/models/user");
 const VendorRegister = require("./src/models/vendorRegister");
 const connectDB = require("./src/config/db");
 
-const EMAIL_TO_DELETE = "rohitjainltp59@gmail.com";
+const EMAIL_TO_DELETE = "manifest.rohit@gmail.com";
 
 async function cleanVendorData() {
     try {

@@ -397,7 +397,7 @@ const sendEmail = async (req, res) => {
                     
                     <!-- Call to Action -->
                     <div class="cta-container">
-                      <a href="https://ocassion-super.vercel.app/vendor-auth" class="cta-button">
+                      <a href="https://oveventz.com/vendor-auth" class="cta-button" target="_blank">
                         🚀 Access Your Dashboard
                       </a>
                     </div>
