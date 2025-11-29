@@ -13,10 +13,10 @@ async function cleanAllAdminData() {
 
         let totalDeleted = 0;
 
-        // ========== STEP 1: Delete All Customer Requests ==========
-        console.log("🗑️  Starting cleanup of Customer Requests...");
+        // ========== STEP 1: Delete All Customer Requests/Bookings ==========
+        console.log("🗑️  Starting cleanup of Customer Requests/Bookings...");
         const customerDeleteResult = await Customer.deleteMany({});
-        console.log(`   ✅ Deleted ${customerDeleteResult.deletedCount} customer requests`);
+        console.log(`   ✅ Deleted ${customerDeleteResult.deletedCount} customer requests/bookings`);
         totalDeleted += customerDeleteResult.deletedCount;
         console.log("");
 
@@ -28,40 +28,61 @@ async function cleanAllAdminData() {
         const vendorIds = vendors.map(v => v._id);
         console.log(`   📋 Found ${vendors.length} vendor(s) to delete`);
 
-        // Step 2.2: Delete all users with vendor_id references
-        let userDeleteResult = { deletedCount: 0 };
-        if (vendorIds.length > 0) {
-            userDeleteResult = await User.deleteMany({ 
-                vendor_id: { $in: vendorIds } 
-            });
-            console.log(`   ✅ Deleted ${userDeleteResult.deletedCount} vendor user account(s)`);
-            totalDeleted += userDeleteResult.deletedCount;
-        } else {
-            console.log("   ⚠️  No vendors found, skipping user deletion");
-        }
-
-        // Step 2.3: Delete all vendor registrations
+        // Step 2.2: Delete all vendor registrations
         const vendorDeleteResult = await VendorRegister.deleteMany({});
         console.log(`   ✅ Deleted ${vendorDeleteResult.deletedCount} vendor registration(s)`);
         totalDeleted += vendorDeleteResult.deletedCount;
         console.log("");
 
-        // ========== STEP 3: Final Verification ==========
+        // ========== STEP 3: Delete All Users EXCEPT Admin ==========
+        console.log("🗑️  Starting cleanup of Users (keeping only admin)...");
+        
+        // Step 3.1: Count admin users before deletion
+        const adminUsersBefore = await User.find({ role: "admin" });
+        console.log(`   📋 Found ${adminUsersBefore.length} admin user(s) to keep`);
+        
+        // Step 3.2: Delete all non-admin users (vendor, customer, and any with vendor_id)
+        const nonAdminDeleteResult = await User.deleteMany({ 
+            role: { $ne: "admin" } 
+        });
+        console.log(`   ✅ Deleted ${nonAdminDeleteResult.deletedCount} non-admin user(s)`);
+        totalDeleted += nonAdminDeleteResult.deletedCount;
+        
+        // Step 3.3: Also delete any remaining users with vendor_id (in case role is not set properly, but keep admin)
+        const vendorUserDeleteResult = await User.deleteMany({ 
+            vendor_id: { $ne: null },
+            role: { $ne: "admin" }  // Make sure we don't delete admin users
+        });
+        if (vendorUserDeleteResult.deletedCount > 0) {
+            console.log(`   ✅ Deleted ${vendorUserDeleteResult.deletedCount} additional user(s) with vendor_id`);
+            totalDeleted += vendorUserDeleteResult.deletedCount;
+        }
+        console.log("");
+
+        // ========== STEP 4: Final Verification ==========
         console.log("🔍 Final verification...");
         const remainingCustomers = await Customer.countDocuments({});
         const remainingVendors = await VendorRegister.countDocuments({});
-        const remainingVendorUsers = await User.countDocuments({ role: "vendor" });
+        const remainingUsers = await User.countDocuments({});
+        const adminUsers = await User.find({ role: "admin" });
 
-        if (remainingCustomers > 0 || remainingVendors > 0 || remainingVendorUsers > 0) {
+        if (remainingCustomers > 0 || remainingVendors > 0) {
             console.log("⚠️  Warning: Some data still exists!");
             if (remainingCustomers > 0) console.log(`   - ${remainingCustomers} customer request(s) still exist`);
             if (remainingVendors > 0) console.log(`   - ${remainingVendors} vendor(s) still exist`);
-            if (remainingVendorUsers > 0) console.log(`   - ${remainingVendorUsers} vendor user(s) still exist`);
         } else {
             console.log("✅ All data cleaned successfully!");
             console.log(`   - Customer requests: 0`);
             console.log(`   - Vendors: 0`);
-            console.log(`   - Vendor users: 0`);
+        }
+        
+        console.log(`\n👤 User Status:`);
+        console.log(`   - Total users remaining: ${remainingUsers}`);
+        console.log(`   - Admin users: ${adminUsers.length}`);
+        if (adminUsers.length > 0) {
+            adminUsers.forEach(admin => {
+                console.log(`     ✓ ${admin.email} (${admin.role})`);
+            });
         }
 
         // ========== SUMMARY ==========
@@ -69,11 +90,15 @@ async function cleanAllAdminData() {
         console.log("✅ DATABASE CLEANUP COMPLETED!");
         console.log("=".repeat(60));
         console.log(`📊 Total records deleted: ${totalDeleted}`);
-        console.log(`   - Customer requests: ${customerDeleteResult.deletedCount}`);
+        console.log(`   - Customer requests/bookings: ${customerDeleteResult.deletedCount}`);
         console.log(`   - Vendor registrations: ${vendorDeleteResult.deletedCount}`);
-        console.log(`   - Vendor user accounts: ${userDeleteResult.deletedCount}`);
+        console.log(`   - Non-admin users: ${nonAdminDeleteResult.deletedCount}`);
         console.log("=".repeat(60));
-        console.log("✨ Admin dashboard will now show no customer requests or vendor data.");
+        console.log(`👤 Admin credentials preserved: ${adminUsers.length} admin user(s)`);
+        console.log("✨ Admin dashboard will now show:");
+        console.log("   - No customer requests/bookings");
+        console.log("   - No vendor data");
+        console.log("   - Only admin user(s) in users list");
         console.log("=".repeat(60));
 
     } catch (error) {
@@ -89,7 +114,10 @@ async function cleanAllAdminData() {
 
 // Run the cleanup
 console.log("🚀 Starting database cleanup...");
-console.log("⚠️  WARNING: This will delete ALL customer requests and vendor data!");
+console.log("⚠️  WARNING: This will delete:");
+console.log("   - ALL customer requests/bookings");
+console.log("   - ALL vendor data");
+console.log("   - ALL users EXCEPT admin credentials");
 console.log("");
 cleanAllAdminData();
 

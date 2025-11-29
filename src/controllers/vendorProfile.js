@@ -15,6 +15,10 @@ const getVendorProfile = async (req, res) => {
         }
 
         // Find user and populate vendor data
+        // BUG #52: No authorization check - any user can access any vendor profile
+        // User can access other vendor's profile by changing userId in URL
+        // No check if req.user.id matches userId parameter
+        // Vendor A can see Vendor B's profile data
         const user = await User.findById(userId).populate('vendor_id');
 
         if (!user) {

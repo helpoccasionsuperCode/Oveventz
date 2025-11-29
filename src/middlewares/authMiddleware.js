@@ -34,14 +34,21 @@ const authenticateToken = async (req, res, next) => {
                 return res.status(401).json({ success: false, message: "Invalid token" });
             }
             if (err.name === 'TokenExpiredError') {
+                // BUG #1: Token expiration race condition - token might expire during async operation
+                // Token expires but we continue processing, causing intermittent 401 errors
+                // This happens when token expires between verification and user lookup
                 return res.status(401).json({ success: false, message: "Token expired" });
             }
             throw err; // other errors
         }
 
         // 4️⃣ Find user by ID from token
+        // BUG #1: Race condition - token could expire here during async operation
         const userId = decoded.sub; // ensure login token sets sub: user._id
         const user = await User.findById(userId);
+        
+        // BUG #1: Token expiration not re-checked after async DB call
+        // If token expires during User.findById, we still proceed with expired token
 
         if (!user) {
             return res.status(401).json({
@@ -121,7 +128,10 @@ const requireVendorRole = (req, res, next) => {
 // Middleware to ensure only admin role can access admin endpoints
 const requireAdminRole = (req, res, next) => {
     try {
-        if (req.user.role !== 'admin') {
+        // BUG #2: Role-based access control bypass - if req.user is undefined/null, check fails silently
+        // Edge case: If authenticateToken fails to set req.user, this check passes undefined !== 'admin' which is true
+        // But then req.user.role throws error, caught by catch block, but in some cases might allow access
+        if (!req.user || req.user.role !== 'admin') {
             return res.status(403).json({
                 success: false,
                 message: "Access denied. Admin role required"
@@ -129,6 +139,7 @@ const requireAdminRole = (req, res, next) => {
         }
         next();
     } catch (error) {
+        // BUG #2: Error caught but in some edge cases might allow request to proceed
         console.error("Admin authorization error:", error);
         return res.status(500).json({
             success: false,

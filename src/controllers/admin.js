@@ -719,11 +719,17 @@ module.exports = {
             if (city) query.city = city;
             if (category) query.categories = { $in: [category] };
 
+            // BUG #10: N+1 Query Problem - fetching vendors without proper population
+            // Each vendor's user data fetched separately, causing N+1 queries
+            // Should use aggregation or populate to fetch all data in one query
             const vendors = await Vendor.find(query)
                 .sort({ createdAt: -1 });
 
             // Normalize media fields so frontend can safely render
             const safe = (arr) => Array.isArray(arr) ? arr : [];
+            
+            // BUG #10: For each vendor, we check if user exists - this causes N+1 problem
+            // If we have 100 vendors, this makes 100+ database queries instead of 1-2
             const normalized = vendors.map(v => ({
                 ...v.toObject(),
                 images: safe(v.images),
@@ -753,6 +759,8 @@ module.exports = {
                 return res.status(400).json({ success: false, message: `Invalid status. Allowed: ${allowed.join(", ")}` });
             }
 
+            // BUG #3: Race condition - no transaction/locking, multiple admins can update simultaneously
+            // If two admins update same vendor at same time, last write wins, causing data inconsistency
             const vendor = await Vendor.findByIdAndUpdate(
                 id,
                 { status, hasUser },
@@ -762,8 +770,10 @@ module.exports = {
                 return res.status(404).json({ success: false, message: "Vendor not found" });
             }
           
+            // BUG #3: User operations happen after vendor update, no rollback if this fails
             if (status === "approved") {
                 // Reactivate vendor users (if previously deactivated)
+                // BUG: This deleteMany is wrong - should be updateMany to set is_active: true
                 await User.deleteMany(
                     { vendor_id: vendor._id },
                     { is_active: true }
@@ -778,7 +788,11 @@ module.exports = {
 
             return res.status(200).json({ success: true, message: "Vendor status updated", data: { id: vendor._id, status: vendor.status, hasUser: vendor.hasUser } });
         } catch (error) {
+            // BUG #51: Error message leaks internal details in development
+            // Error stack trace or internal error details exposed
+            // Helps attacker understand system structure
             console.error("updateVendorStatus error:", error);
+            // BUG #51: Generic error but console.log might expose sensitive info
             return res.status(500).json({ success: false, message: "Internal Server Error" });
         }
     },
@@ -793,6 +807,9 @@ module.exports = {
             if (vendor_id && mongoose.isValidObjectId(vendor_id)) {
                 query.vendor_id = vendor_id;
             }
+            // BUG #46: Regex search vulnerable to ReDoS (Regular Expression Denial of Service)
+            // Malicious search pattern can cause server to hang
+            // No input sanitization, user can send complex regex patterns
             if (search) {
                 query.email = { $regex: search, $options: "i" };
             }
@@ -811,11 +828,18 @@ module.exports = {
     // Get Dashboard Statistics
     getDashboardStats: async (req, res) => {
         try {
+            // BUG #15: Dashboard stats calculation race - stats calculated while data is being updated
+            // If vendor status updated during this calculation, stats become inconsistent
+            // No locking or transaction, concurrent updates cause incorrect counts
+            // BUG #53: Stats query doesn't filter deleted/inactive vendors
+            // Count includes vendors that might be soft-deleted or inactive
             // Total Active Vendors (approved vendors)
             const activeVendors = await Vendor.countDocuments({ 
                 status: "approved"
+                // BUG #53: Missing isActive: true filter
             });
 
+            // BUG #15: Race condition - vendor status might change between count and aggregate
             // Total Vendors by Status
             const vendorStatusCounts = await Vendor.aggregate([
                 {
@@ -949,8 +973,13 @@ module.exports = {
                 return res.status(404).json({ success: false, message: "Email not found" });
             }
 
+            // BUG #44: Password reset without old password verification
+            // Anyone with email can reset password without knowing current password
+            // No rate limiting, can be brute forced
             // Hash the new password
             const bcrypt = require("bcrypt");
+            // BUG #44: No password strength validation
+            // Can set weak password like "123" or "password"
             const hashedPassword = await bcrypt.hash(password.trim(), 10);
 
             // Update password

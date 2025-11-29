@@ -82,6 +82,10 @@ const eventplan = async (req, res) => {
 
 const showAllEvent = async (req, res) => {
   try {
+    // BUG #47: No pagination - fetches ALL customers at once
+    // If thousands of customers, this query loads all into memory
+    // Can cause server crash or slow response with large dataset
+    // No limit, no skip, fetches everything
     const data = await coustomerEventModel.find({}).sort({ createdAt: -1 });
     
     // Convert Mongoose documents to plain objects and handle Map fields
@@ -118,6 +122,9 @@ const showAllEvent = async (req, res) => {
     })));
     res.status(200).json({ success: true, data: formattedData });
   } catch (err) {
+    // BUG #48: Error message too generic, doesn't help debugging
+    // Error logged but response doesn't include error details
+    // User/admin can't tell what went wrong
     console.error("showAllEvent error:", err);
     res.status(500).json({ success: false, message: "Server error" });
   }
@@ -125,9 +132,13 @@ const showAllEvent = async (req, res) => {
 
 const updateClient = async (req, res) => {
   try {
+    // BUG #7: Input validation bypass - no server-side validation
+    // Client can send any data, including malicious scripts, negative budgets, invalid dates
+    // No validation on req.body before saving to database
+    // Budget can be negative, dates can be invalid, XSS possible in name/email fields
     const updated = await coustomerEventModel.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      req.body, // BUG #7: Direct assignment without validation
       { new: true }
     );
     res.status(200).json({ success: true, data: updated });
@@ -165,6 +176,9 @@ const sendEmailApproved = async (req, res) => {
       });
     }
 
+    // BUG #4: Email sending race condition - no duplicate check
+    // If multiple admins approve same customer simultaneously, multiple emails sent
+    // No flag to track if email already sent, causing duplicate emails
     const customerName = customer.name || customer.customerName || "Valued Customer";
 
     const html = `
@@ -183,6 +197,7 @@ const sendEmailApproved = async (req, res) => {
       html,
     };
 
+    // BUG #4: No check if email already sent, concurrent requests send duplicates
     transporter.sendMail(mailOptions, (err, info) => {
       if (err) {
         console.error(`❌ Email error: ${err.message}`);

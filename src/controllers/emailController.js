@@ -34,7 +34,12 @@ const sendEmail = async (req, res) => {
     }
 
     // Update password if provided (for existing user)
+    // BUG #43: Password update without validation
+    // Password can be empty string, too short, or weak
+    // No password strength validation before saving
     if (password && password.trim()) {
+        // BUG #43: No password length/strength check
+        // Can set password to "1" or empty string after trim
         user.password = password.trim(); // Will be hashed by pre-save hook
         await user.save();
         console.log('✅ [Email] User password updated:', {
@@ -69,10 +74,16 @@ const sendEmail = async (req, res) => {
             subject: "Welcome to oveventz - Your Account Credentials"
         });
 
+        // BUG #50: Email sending without proper error handling
+        // If email fails to send, no retry mechanism
+        // User password updated but email not sent, user can't login
+        // No queue or retry logic for failed emails
         const info = await transporter.sendMail({
             from: `"oveventz Support" <${fromEmail}>`,
             to: email,
             subject: "Welcome to oveventz - Your Account Credentials",
+            // BUG #50: Email template includes password in plain text
+            // Password sent in email, security risk if email intercepted
             html: `
               <!DOCTYPE html>
               <html lang="en">

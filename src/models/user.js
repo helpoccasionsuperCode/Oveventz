@@ -59,6 +59,10 @@ UserSchema.pre("save", async function (next) {
 });
 
 UserSchema.methods.comparePassword = async function (candidatePassword) {
+    // BUG #40: Password comparison doesn't handle null/undefined password
+    // If password field is null or undefined, bcrypt.compare throws error
+    // Should check if this.password exists before comparing
+    // Edge case: user with no password can cause crash
     return bcrypt.compare(candidatePassword, this.password);
 };
 

@@ -191,8 +191,14 @@ module.exports = {
                 return res.status(400).json({ success: false, message: "email and password are required" });
             }
 
+            // BUG #49: Timing attack vulnerability in login
+            // Different response times for invalid email vs invalid password
+            // Attacker can enumerate valid emails by measuring response time
+            // User lookup happens before password check, revealing email existence
             const user = await User.findOne({ email });
             if (!user) {
+                // BUG #49: Returns immediately, faster than password check
+                // Timing difference reveals if email exists
                 return res.status(400).json({ success: false, message: "Invalid email" });
             }
 
@@ -202,6 +208,8 @@ module.exports = {
 
             const isMatch = await user.comparePassword(password);
             if (!isMatch) {
+                // BUG #49: Slower response (password hash comparison takes time)
+                // Timing difference between "email not found" and "wrong password"
                 return res.status(401).json({ success: false, message: "Invalid credentials" });
             }
 
@@ -239,7 +247,7 @@ module.exports = {
         }
     },
 
- saveData : async (req, res) => {
+    saveData : async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -272,6 +280,9 @@ module.exports = {
       });
     }
 
+    // BUG #42: Transaction missing - user created but vendor update fails
+    // If vendor.save() fails, user exists but vendor.hasUser not updated
+    // Data inconsistency: user created but vendor doesn't know about it
     // Create new user with vendor_id linked
     const user = new User({ 
       email: normalizedEmail, 
@@ -281,6 +292,7 @@ module.exports = {
     });
     await user.save();
 
+    // BUG #42: No rollback if this fails - user already saved
     // Update VendorRegister.hasUser flag
     vendor.hasUser = true;
     await vendor.save();

@@ -13,6 +13,10 @@ const vendorRegisterForm = async (req, res, next) => {
         console.log("Validated data:", vendorData);
 
         // ✅ Check if vendor already exists (Business Logic)
+        // BUG #41: Race condition in vendor registration check
+        // Two requests with same email can pass this check simultaneously
+        // Both create vendor with same email, causing duplicate key error
+        // No transaction or locking mechanism
         const existingVendor = await vendorRegisterModel.findOne({
             email: vendorData.email
         });
@@ -116,6 +120,9 @@ const vendorRegisterForm = async (req, res, next) => {
 
 const getApprovedVendors = async (req, res) => {
     try {
+        // BUG #45: Wrong field name in query - isActive vs is_active
+        // Schema uses isActive but might be stored as is_active
+        // Query might return empty results even if vendors exist
         const vendors = await vendorRegisterModel
             .find({ status: "approved", isActive: true })
             .select(
